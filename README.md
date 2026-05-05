@@ -26,13 +26,39 @@ cd stock-chker
 python3 server.py
 ```
 
-Your default browser will open at <http://localhost:8765>. If it doesn't, open that URL manually.
+On startup the server prints something like:
+
+```
+============================================================
+ stock-chker is running
+============================================================
+ On this PC:    http://127.0.0.1:8765/
+ On your phone: http://192.168.1.42:8765/
+   (phone must be on the same WiFi as this PC)
+============================================================
+```
+
+Your default browser opens the PC URL automatically. To use it on your **phone**, just type the printed `http://192.168.x.y:8765/` URL into your phone's browser (same WiFi network). The PC must stay on — it's the one running the server.
+
+> **Per-device list:** the link list is stored in each browser's `localStorage`, so the phone and the PC each have their own copy. (Server-side shared state + true 24/7 server-side polling can be added in a follow-up — open an issue if you want it.)
 
 To stop the server, press `Ctrl+C` in the terminal.
+
+### CLI options
+
+| Flag           | Effect                                                         |
+| -------------- | -------------------------------------------------------------- |
+| `--port N`     | Listen on port `N` instead of `8765`.                          |
+| `--local-only` | Bind to `127.0.0.1` only — phones on your WiFi can't reach it. |
+| `--no-browser` | Don't auto-open a browser tab on startup.                      |
 
 ### Why a local server (instead of just opening `index.html`)?
 
 Browsers block plain `file://` pages from making cross-origin requests to `one.google.com` (CORS). The tiny Python server proxies those checks for you, fully on your own machine — nothing leaves your computer except the requests you'd be making anyway by clicking the links yourself.
+
+### Security note
+
+By default the server binds to `0.0.0.0` so your phone (and any other device on the same WiFi) can reach it. **Anyone on your local WiFi can open the URL too** — it's a personal tool meant for trusted home networks. If you're on untrusted WiFi (cafe, airport) and don't want others to see your link list, run with `--local-only`.
 
 ## Folder layout
 
