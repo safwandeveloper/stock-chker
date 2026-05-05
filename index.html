@@ -124,15 +124,16 @@
 
   <main>
     <section class="card">
-      <h2>Paste links (any format)</h2>
-      <textarea id="pasteBox" placeholder="Paste anything - usernames, timestamps, and links mixed together. Only URLs will be kept.
+      <h2>Paste links (any format, any number)</h2>
+      <textarea id="pasteBox" placeholder="Paste anything — usernames, timestamps, and links mixed together. Only URLs will be kept.
+You can paste 20, 50, even 100+ links in one go. Each link is auto-trimmed from https:// up to its last '=' (so trailing junk after the token is dropped).
 
 Example:
 gemini 18m 0.6$, [May 5, 2026 at 10:53 AM]
-https://one.google.com/activate-plan/subscription/new/AQ...
+https://one.google.com/activate-plan/subscription/new/AQ...=
 
 gemini 18m 0.6$, [May 5, 2026 at 10:09 AM]
-https://one.google.com/activate-plan/subscription/new/AQ..."></textarea>
+https://one.google.com/activate-plan/subscription/new/AQ...="></textarea>
       <div class="row" style="margin-top:10px">
         <button id="btnAdd">Clean &amp; Add</button>
         <button class="ghost" id="btnAddClear">Clean, Add &amp; Clear Box</button>
@@ -156,6 +157,8 @@ https://one.google.com/activate-plan/subscription/new/AQ..."></textarea>
           sec
         </label>
         <span style="flex:1"></span>
+        <button class="ghost" id="btnCopyLive" title="Copy all live links to clipboard">Copy live</button>
+        <button class="ghost" id="btnCopyAll" title="Copy all links to clipboard">Copy all</button>
         <button class="ghost" id="btnDownloadLive">Download live (.txt)</button>
         <button class="ghost" id="btnDownloadAll">Download all (.txt)</button>
         <button class="warn" id="btnRemoveDead">Remove dead</button>

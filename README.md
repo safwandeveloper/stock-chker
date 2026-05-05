@@ -17,13 +17,14 @@ In this **static mode** the page works fully offline-after-load: paste, auto-cle
 
 ## Features
 
-- **Paste box** — drop in any blob of text (usernames, timestamps, anything). Only `http(s)://` links are kept; lines like `gemini 18m 0.6$, [May 5, 2026 at 10:53 AM]` are auto-stripped.
-- **Duplicate check** — already-in-list URLs are skipped on add.
+- **Paste box** — drop in any blob of text (usernames, timestamps, anything). Only `http(s)://` links are kept; lines like `gemini 18m 0.6$, [May 5, 2026 at 10:53 AM]` are auto-stripped. You can paste **20, 50, even 100+ links at once** — they all get parsed in one go.
+- **Auto-trim to last `=`** — every extracted link is trimmed from `https://` up to the last `=` it contains (matching Google One / activation tokens that end in base64 `=` padding). Anything stuck on after the final `=` (junk text, another concatenated link, etc.) is dropped.
+- **Duplicate check** — already-in-list URLs are skipped on add (compared **after** trimming, so links that only differ in trailing junk are correctly recognized as the same link).
 - **24/7 stock check** — while the page is open, every link is polled in the background. Each link shows:
   - 🟢 **live** — Google One activation page is still reachable (offer claimable).
   - 🔴 **dead** — redirected away / 404 / explicit "redeemed" path (offer gone).
   - 🟡 **unknown** — network/timeout, will retry next cycle.
-- **One-click .txt export** — download all live links (or all links) as a clean text file with 2 blank lines between each URL.
+- **Copy & .txt export** — one-click **Copy live** / **Copy all** copies the URLs to the clipboard (separated by 2 blank lines), or download them as a `.txt` file in the same format. Each row also has its own **Copy** button.
 - **Persistence** — your list is saved in `localStorage`, so reloading the tab keeps everything.
 - **Filters** — show only live / dead / unknown / pending.
 
