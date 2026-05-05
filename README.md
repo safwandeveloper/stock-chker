@@ -1,8 +1,19 @@
 # stock-chker
 
-Tiny **personal**, **local-only** web app for managing and 24/7 checking Gemini-style activation links.
+Tiny **personal** web app for managing and checking Gemini-style activation links.
 
-> Runs entirely on your own PC — no domain, no hosting, no third-party server, no `pip install`. Pure Python stdlib + a single `index.html`.
+> Runs two ways: **(A)** on GitHub Pages straight from your phone, no PC needed (paste / clean / dedupe / .txt download work; stock-check is manual via Open + Mark live/dead). **(B)** locally on your PC with the bundled Python server (everything in A, plus automatic 24/7 stock-check for as long as the tab is open).
+
+## Quick: run on your phone (no PC)
+
+1. **Fork or use this repo** as-is on GitHub.
+2. On GitHub: `Settings` → `Pages` → set **Source** to `Deploy from a branch`, **Branch** = `main`, folder = `/ (root)` → **Save**.
+3. Wait ~30–60 seconds. GitHub will show your URL: `https://<your-username>.github.io/stock-chker/`.
+4. Bookmark it on your phone. Done.
+
+In this **static mode** the page works fully offline-after-load: paste, auto-clean, dedupe, .txt download, and the per-link **Open** + **Mark live** / **Mark dead** buttons all work. The list is saved in your browser's `localStorage`, so it survives reloads on that one device.
+
+> Browsers block static pages from fetching `one.google.com` directly (CORS), which is why the auto stock-check is unavailable in this mode. Use **Open** to glance at a link, then mark it live or dead.
 
 ## Features
 
@@ -16,9 +27,9 @@ Tiny **personal**, **local-only** web app for managing and 24/7 checking Gemini-
 - **Persistence** — your list is saved in `localStorage`, so reloading the tab keeps everything.
 - **Filters** — show only live / dead / unknown / pending.
 
-## Run it
+## Run it locally (with auto stock-check)
 
-You need Python 3.8+ (already installed on most systems).
+Use this when you want the **automatic 24/7** check on a Gemini link (only works while the tab is open). Requires a PC and Python 3.8+ (already installed on most systems).
 
 ```bash
 git clone https://github.com/safwandeveloper/stock-chker.git

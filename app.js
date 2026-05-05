@@ -18,6 +18,10 @@
 
   let autoTimer = null;
   let inFlight = 0;
+  // staticMode = true when /api/health is unreachable (e.g. GitHub Pages).
+  // In that mode we disable auto-check and show manual Open / Mark live / Mark dead buttons.
+  let staticMode = false;
+  let modeKnown = false;
 
   // --------- persistence ---------
   function load() {
@@ -103,6 +107,7 @@
 
   // --------- checking ---------
   async function checkOne(idx) {
+    if (staticMode) return; // no API in static mode
     const link = state.links[idx];
     if (!link) return;
     link.status = "checking";
@@ -111,7 +116,7 @@
     renderRow(idx);
     updateAutoStatus();
     try {
-      const r = await fetch("/api/check?url=" + encodeURIComponent(link.url));
+      const r = await fetch("api/check?url=" + encodeURIComponent(link.url));
       const data = await r.json();
       link.status = data.status || "unknown";
       link.message = data.message || "";
@@ -129,6 +134,19 @@
       renderStats();
       updateAutoStatus();
     }
+  }
+
+  function markStatus(idx, status) {
+    const link = state.links[idx];
+    if (!link) return;
+    link.status = status;
+    link.message = status === "live" ? "Marked live (manual)" :
+                   status === "dead" ? "Marked dead (manual)" :
+                   "";
+    link.checkedAt = Date.now();
+    save();
+    renderRow(idx);
+    renderStats();
   }
 
   async function checkAll(concurrency = 4) {
@@ -149,6 +167,10 @@
   }
 
   function startAuto() {
+    if (staticMode) {
+      flash("Auto-check needs the local server. You're on GitHub Pages — use Open + Mark live/dead.");
+      return;
+    }
     if (autoTimer) return;
     state.autoOn = true;
     save();
@@ -267,6 +289,9 @@
     tbody.innerHTML = idxs
       .map((i) => {
         const l = state.links[i];
+        const checkBtn = staticMode
+          ? ""
+          : `<button class="ghost" data-act="check">Check</button>`;
         return `
           <tr data-idx="${i}">
             <td class="st">${statusBadge(l.status)}</td>
@@ -276,7 +301,10 @@
             </td>
             <td class="time">${fmtTime(l.checkedAt)}</td>
             <td class="actions">
-              <button class="ghost" data-act="check">Check</button>
+              <a class="open-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">Open</a>
+              ${checkBtn}
+              <button class="mark-live" data-act="mark-live" title="Mark this link live">✓ Live</button>
+              <button class="mark-dead" data-act="mark-dead" title="Mark this link dead">✕ Dead</button>
               <button class="danger" data-act="remove">Remove</button>
             </td>
           </tr>`;
@@ -287,8 +315,11 @@
       btn.addEventListener("click", () => {
         const tr = btn.closest("tr");
         const i = Number(tr.dataset.idx);
-        if (btn.dataset.act === "check") checkOne(i);
-        else if (btn.dataset.act === "remove") removeAt(i);
+        const act = btn.dataset.act;
+        if (act === "check") checkOne(i);
+        else if (act === "remove") removeAt(i);
+        else if (act === "mark-live") markStatus(i, "live");
+        else if (act === "mark-dead") markStatus(i, "dead");
       });
     });
   }
@@ -316,6 +347,12 @@
   function updateAutoStatus() {
     const el = $("autocheckStatus");
     const btn = $("btnToggleAuto");
+    if (staticMode) {
+      el.className = "badge unknown";
+      el.textContent = "manual mode";
+      btn.textContent = "Auto-check (offline)";
+      return;
+    }
     if (state.autoOn) {
       const suffix = inFlight ? ` (checking ${inFlight})` : "";
       el.className = "badge checking";
@@ -330,17 +367,49 @@
 
   async function pingServer() {
     const el = $("serverStatus");
+    let online = false;
     try {
-      const r = await fetch("/api/health");
+      const r = await fetch("api/health", { cache: "no-store" });
       if (r.ok) {
-        el.className = "badge live";
-        el.textContent = "server ok";
-        return true;
+        const data = await r.json().catch(() => ({}));
+        if (data && data.ok) online = true;
       }
     } catch (e) {}
-    el.className = "badge dead";
-    el.textContent = "server offline";
+    if (online) {
+      el.className = "badge live";
+      el.textContent = "local server: connected";
+      if (staticMode || !modeKnown) {
+        staticMode = false;
+        modeKnown = true;
+        applyModeUI();
+      }
+      return true;
+    }
+    el.className = "badge unknown";
+    el.textContent = "static mode (no auto-check)";
+    if (!staticMode || !modeKnown) {
+      staticMode = true;
+      modeKnown = true;
+      if (state.autoOn) stopAuto();
+      applyModeUI();
+    }
     return false;
+  }
+
+  function applyModeUI() {
+    const idsToToggle = ["btnCheckAll", "btnToggleAuto", "intervalSec"];
+    for (const id of idsToToggle) {
+      const el = $(id);
+      if (el) el.disabled = staticMode;
+    }
+    const note = $("footerNote");
+    if (note) {
+      note.innerHTML = staticMode
+        ? `Static mode: browsers can't fetch Google directly. Click <strong>Open</strong> to view a link, then mark it <span class="badge live">live</span> or <span class="badge dead">dead</span>. Paste / clean / dedupe / .txt download all still work.`
+        : `Auto-check pings each link via the local Python proxy (so CORS is bypassed). Status: <span class="badge live">live</span> still claimable &middot; <span class="badge dead">dead</span> redeemed/expired/404 &middot; <span class="badge unknown">unknown</span> network/timeout, retry`;
+    }
+    renderRows();
+    updateAutoStatus();
   }
 
   // --------- wire-up ---------
