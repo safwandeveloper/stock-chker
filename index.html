@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>stock-chker</title>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --panel: #161b22;
+      --panel-2: #1f2630;
+      --border: #2a313c;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2f81f7;
+      --live: #3fb950;
+      --dead: #f85149;
+      --unk: #d29922;
+      --pending: #6e7681;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { min-height: 100vh; }
+    header {
+      padding: 18px 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--panel);
+      position: sticky; top: 0; z-index: 5;
+    }
+    header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+    header .meta { color: var(--muted); font-size: 12px; }
+    main { padding: 20px 24px 80px; max-width: 1100px; margin: 0 auto; }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .grow { flex: 1; min-width: 0; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px; margin-bottom: 16px;
+    }
+    .card h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+    textarea {
+      width: 100%; min-height: 160px; resize: vertical;
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    button {
+      background: var(--accent); color: white; border: 0;
+      padding: 8px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 600;
+    }
+    button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    button.danger { background: var(--dead); }
+    button.warn { background: var(--unk); color: #1c1c1c; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    button + button { margin-left: 6px; }
+
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat {
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; min-width: 90px;
+    }
+    .stat .n { font-size: 20px; font-weight: 700; }
+    .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+    .toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .toolbar input[type=number] {
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 8px; width: 80px;
+    }
+    label.inline { font-size: 12px; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+    th { background: var(--panel-2); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; position: sticky; top: 64px; z-index: 1; }
+    td.url { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all; }
+    td.msg { color: var(--muted); font-size: 12px; }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .badge.live { background: rgba(63,185,80,.15); color: var(--live); border: 1px solid rgba(63,185,80,.4); }
+    .badge.dead { background: rgba(248,81,73,.15); color: var(--dead); border: 1px solid rgba(248,81,73,.4); }
+    .badge.unknown { background: rgba(210,153,34,.15); color: var(--unk); border: 1px solid rgba(210,153,34,.4); }
+    .badge.pending { background: rgba(110,118,129,.15); color: var(--pending); border: 1px solid rgba(110,118,129,.4); }
+    .badge.checking { background: rgba(47,129,247,.15); color: var(--accent); border: 1px solid rgba(47,129,247,.4); }
+
+    .actions a { color: var(--accent); text-decoration: none; margin-right: 10px; }
+    .actions button { padding: 4px 8px; font-size: 11px; }
+
+    .empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .filter {
+      background: var(--panel-2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 999px; padding: 4px 12px;
+      font-size: 12px; cursor: pointer;
+    }
+    .filter.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+    .footer-note { color: var(--muted); font-size: 12px; margin-top: 16px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>stock-chker</h1>
+    <div class="meta">
+      <span id="serverStatus" class="badge unknown">checking server</span>
+      <span id="autocheckStatus" class="badge pending" style="margin-left:6px">auto-check off</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Paste links (any format)</h2>
+      <textarea id="pasteBox" placeholder="Paste anything - usernames, timestamps, and links mixed together. Only URLs will be kept.
+
+Example:
+gemini 18m 0.6$, [May 5, 2026 at 10:53 AM]
+https://one.google.com/activate-plan/subscription/new/AQ...
+
+gemini 18m 0.6$, [May 5, 2026 at 10:09 AM]
+https://one.google.com/activate-plan/subscription/new/AQ..."></textarea>
+      <div class="row" style="margin-top:10px">
+        <button id="btnAdd">Clean &amp; Add</button>
+        <button class="ghost" id="btnAddClear">Clean, Add &amp; Clear Box</button>
+        <span class="grow"></span>
+        <span id="parsePreview" class="meta" style="color:var(--muted); font-size:12px"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Summary</h2>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="card">
+      <h2>Links</h2>
+      <div class="toolbar">
+        <button id="btnCheckAll">Check all now</button>
+        <button class="ghost" id="btnToggleAuto">Start auto-check</button>
+        <label class="inline">interval
+          <input type="number" id="intervalSec" min="10" value="120" />
+          sec
+        </label>
+        <span style="flex:1"></span>
+        <button class="ghost" id="btnDownloadLive">Download live (.txt)</button>
+        <button class="ghost" id="btnDownloadAll">Download all (.txt)</button>
+        <button class="warn" id="btnRemoveDead">Remove dead</button>
+        <button class="danger" id="btnClearAll">Clear all</button>
+      </div>
+
+      <div class="filters" id="filters"></div>
+
+      <div style="overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:90px">Status</th>
+              <th>URL</th>
+              <th style="width:230px">Last check</th>
+              <th style="width:160px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
+      <div class="footer-note">
+        Auto-check pings each link via the local Python proxy (so CORS is bypassed).
+        Status: <span class="badge live">live</span> still claimable
+        &middot; <span class="badge dead">dead</span> redeemed/expired/404
+        &middot; <span class="badge unknown">unknown</span> network/timeout, retry
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
