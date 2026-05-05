@@ -88,8 +88,17 @@
     .badge.pending { background: rgba(110,118,129,.15); color: var(--pending); border: 1px solid rgba(110,118,129,.4); }
     .badge.checking { background: rgba(47,129,247,.15); color: var(--accent); border: 1px solid rgba(47,129,247,.4); }
 
-    .actions a { color: var(--accent); text-decoration: none; margin-right: 10px; }
+    .actions { white-space: nowrap; }
+    .actions a.open-link {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); text-decoration: none; font-size: 11px;
+      font-weight: 600; margin-right: 4px;
+    }
+    .actions a.open-link:hover { background: var(--panel-2); }
     .actions button { padding: 4px 8px; font-size: 11px; }
+    .actions button.mark-live { background: var(--live); color: #052e10; }
+    .actions button.mark-dead { background: var(--dead); color: #2a0606; }
 
     .empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
 
@@ -161,15 +170,15 @@ https://one.google.com/activate-plan/subscription/new/AQ..."></textarea>
             <tr>
               <th style="width:90px">Status</th>
               <th>URL</th>
-              <th style="width:230px">Last check</th>
-              <th style="width:160px">Actions</th>
+              <th style="width:200px">Last check</th>
+              <th style="width:300px">Actions</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
 
-      <div class="footer-note">
+      <div class="footer-note" id="footerNote">
         Auto-check pings each link via the local Python proxy (so CORS is bypassed).
         Status: <span class="badge live">live</span> still claimable
         &middot; <span class="badge dead">dead</span> redeemed/expired/404
