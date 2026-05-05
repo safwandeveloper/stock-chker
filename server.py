@@ -1,11 +1,17 @@
-"""Local-only stock checker server (Python stdlib, no pip install).
+"""stock-chker local server (Python stdlib, no pip install).
 
 Run:
-    python3 server.py
-Then open http://localhost:8765 in your browser.
+    python3 server.py             # PC + phones on same WiFi can reach it
+    python3 server.py --local-only  # PC only (loopback)
+    python3 server.py --port 9000
+
+The server prints the URL(s) to use - including a LAN URL like
+http://192.168.x.y:8765 so you can open it from your phone's browser.
 """
 from __future__ import annotations
 
+import argparse
+import ipaddress
 import json
 import socket
 import sys
@@ -16,8 +22,7 @@ import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-PORT = 8765
-HOST = "127.0.0.1"
+DEFAULT_PORT = 8765
 TIMEOUT = 20  # seconds for the upstream check
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -157,15 +162,97 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
 
-def main() -> None:
-    server = HTTPServer((HOST, PORT), Handler)
-    url = f"http://{HOST}:{PORT}/"
-    print(f"stock-chker running at {url}")
-    print("Press Ctrl+C to stop.")
+def discover_lan_ips() -> list[str]:
+    """Best-effort enumeration of this machine's LAN IPv4 addresses."""
+    ips: list[str] = []
+
+    # Trick: open a UDP socket to a public address (no packets actually sent)
+    # and read back the source IP the OS picked. This is the most reliable
+    # way to get "the IP your router sees you as".
     try:
-        webbrowser.open(url)
-    except Exception:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            if ip and ip not in ips:
+                ips.append(ip)
+        finally:
+            s.close()
+    except OSError:
         pass
+
+    # Fallback: hostname lookup.
+    try:
+        host = socket.gethostname()
+        for info in socket.getaddrinfo(host, None, family=socket.AF_INET):
+            ip = info[4][0]
+            if ip and ip not in ips:
+                ips.append(ip)
+    except socket.gaierror:
+        pass
+
+    # Filter to private/LAN ranges and skip loopback (we already print it).
+    out: list[str] = []
+    for ip in ips:
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if addr.is_loopback:
+            continue
+        if addr.is_private or addr.is_link_local:
+            out.append(ip)
+    return out
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="stock-chker local server (Python stdlib only).",
+    )
+    p.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"Port to listen on (default: {DEFAULT_PORT}).",
+    )
+    p.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Bind to 127.0.0.1 only. Default binds to 0.0.0.0 so devices on "
+             "your WiFi (e.g. your phone) can reach it.",
+    )
+    p.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not auto-open the default browser.",
+    )
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv if argv is not None else sys.argv[1:])
+    bind = "127.0.0.1" if args.local_only else "0.0.0.0"
+    port = args.port
+
+    server = HTTPServer((bind, port), Handler)
+
+    print("=" * 60)
+    print(" stock-chker is running")
+    print("=" * 60)
+    print(f" On this PC:    http://127.0.0.1:{port}/")
+    if not args.local_only:
+        for ip in discover_lan_ips():
+            print(f" On your phone: http://{ip}:{port}/")
+        print("   (phone must be on the same WiFi as this PC)")
+    print("=" * 60)
+    print(" Press Ctrl+C to stop.")
+
+    if not args.no_browser:
+        try:
+            webbrowser.open(f"http://127.0.0.1:{port}/")
+        except Exception:
+            pass
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
