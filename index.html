@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>stock-chker</title>
   <style>
     :root {
@@ -111,6 +114,46 @@
     .filter.active { background: var(--accent); border-color: var(--accent); color: white; }
 
     .footer-note { color: var(--muted); font-size: 12px; margin-top: 16px; text-align: center; }
+
+    /* Code-block view of saved links — styled like a chat-app code block,
+       with a copy button at the top-right corner. */
+    .codeblock {
+      position: relative;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px 14px 16px;
+      max-height: 60vh;
+      overflow: auto;
+    }
+    .codeblock-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+      color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .codeblock-header .label { font-weight: 700; }
+    .codeblock-header .copy-icon {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .codeblock-header .copy-icon:hover { background: var(--panel); }
+    .codeblock pre {
+      margin: 0;
+      font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: #7ee787;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .codeblock-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+    .codeblock-toolbar {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .codeblock-toolbar .seg {
+      background: var(--panel-2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 999px; padding: 4px 12px;
+      font-size: 12px; cursor: pointer;
+    }
+    .codeblock-toolbar .seg.active { background: var(--accent); border-color: var(--accent); color: white; }
   </style>
 </head>
 <body>
@@ -145,6 +188,28 @@ https://one.google.com/activate-plan/subscription/new/AQ...="></textarea>
     <section class="card">
       <h2>Summary</h2>
       <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="card">
+      <h2>Clean links — tap copy</h2>
+      <div class="codeblock-toolbar" id="codeblockToolbar">
+        <button class="seg active" data-cb-filter="live">Live</button>
+        <button class="seg" data-cb-filter="all">All</button>
+        <button class="seg" data-cb-filter="pending">Pending</button>
+        <button class="seg" data-cb-filter="unknown">Unknown</button>
+        <button class="seg" data-cb-filter="dead">Dead</button>
+      </div>
+      <div class="codeblock">
+        <div class="codeblock-header">
+          <span class="label" id="codeblockLabel">Code · 0 links</span>
+          <button class="copy-icon" id="btnCodeblockCopy" title="Copy these links to clipboard">
+            <span aria-hidden="true">⧉</span>
+            <span>Copy</span>
+          </button>
+        </div>
+        <pre id="codeblockBody"></pre>
+        <div class="codeblock-empty" id="codeblockEmpty" style="display:none">No links to show in this view.</div>
+      </div>
     </section>
 
     <section class="card">
@@ -190,6 +255,6 @@ https://one.google.com/activate-plan/subscription/new/AQ...="></textarea>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

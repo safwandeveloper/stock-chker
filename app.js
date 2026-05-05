@@ -8,10 +8,11 @@
   const STORAGE_KEY = "stockchker:v1";
   const URL_REGEX = /https?:\/\/[^\s<>"'`\\]+/gi;
 
-  /** @type {{links: Array<{url:string,status:string,message:string,statusCode:number,finalUrl:string,addedAt:number,checkedAt:number}>, filter:string, intervalSec:number, autoOn:boolean}} */
+  /** @type {{links: Array<{url:string,status:string,message:string,statusCode:number,finalUrl:string,addedAt:number,checkedAt:number}>, filter:string, codeblockFilter:string, intervalSec:number, autoOn:boolean}} */
   const state = {
     links: [],
     filter: "all",
+    codeblockFilter: "live",
     intervalSec: 120,
     autoOn: false,
   };
@@ -31,11 +32,40 @@
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.links)) {
         state.links = parsed.links.map(normalizeLink);
+        // Re-apply the trim-to-last-"=" rule to anything that was saved before
+        // we shipped that rule, and merge any duplicates that creates. This
+        // makes the dedupe consistent: pasting "the same" link a second time
+        // recognizes it as a duplicate even if your old entry was un-trimmed.
+        migrateLinks();
       }
       if (typeof parsed.intervalSec === "number") state.intervalSec = parsed.intervalSec;
       if (typeof parsed.filter === "string") state.filter = parsed.filter;
+      if (typeof parsed.codeblockFilter === "string") state.codeblockFilter = parsed.codeblockFilter;
     } catch (e) {
       console.warn("Failed to load state", e);
+    }
+  }
+  function migrateLinks() {
+    const seen = new Map();
+    let changed = false;
+    for (const l of state.links) {
+      const cleaned = cleanUrl(l.url);
+      if (cleaned !== l.url) changed = true;
+      l.url = cleaned;
+      const prev = seen.get(cleaned);
+      if (!prev) {
+        seen.set(cleaned, l);
+        continue;
+      }
+      changed = true;
+      // Keep the entry with the most recent check (or the first one if neither was checked).
+      if ((l.checkedAt || 0) > (prev.checkedAt || 0)) {
+        seen.set(cleaned, l);
+      }
+    }
+    if (changed) {
+      state.links = Array.from(seen.values()).filter((l) => l.url);
+      save();
     }
   }
   function save() {
@@ -46,6 +76,7 @@
           links: state.links,
           intervalSec: state.intervalSec,
           filter: state.filter,
+          codeblockFilter: state.codeblockFilter,
         }),
       );
     } catch (e) {
@@ -408,6 +439,41 @@
   function render() {
     renderStats();
     renderRows();
+    renderCodeblock();
+  }
+
+  function codeblockLinks() {
+    const f = state.codeblockFilter || "live";
+    if (f === "all") return state.links.slice();
+    return state.links.filter((l) => l.status === f);
+  }
+
+  function renderCodeblock() {
+    const links = codeblockLinks();
+    const label = $("codeblockLabel");
+    const body = $("codeblockBody");
+    const empty = $("codeblockEmpty");
+    if (label) {
+      label.textContent = `Code · ${links.length} link${links.length === 1 ? "" : "s"}`;
+    }
+    if (body && empty) {
+      if (!links.length) {
+        body.textContent = "";
+        body.style.display = "none";
+        empty.style.display = "block";
+      } else {
+        // Two blank lines between URLs (so 3 newlines), matching the .txt and clipboard exports.
+        body.textContent = links.map((l) => l.url).join("\n\n\n");
+        body.style.display = "block";
+        empty.style.display = "none";
+      }
+    }
+    const tb = $("codeblockToolbar");
+    if (tb) {
+      tb.querySelectorAll(".seg").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.cbFilter === state.codeblockFilter);
+      });
+    }
   }
 
   function removeAt(i) {
@@ -547,6 +613,24 @@
     $("btnCopyAll").addEventListener("click", () => {
       copyLinksToClipboard(state.links, "all");
     });
+
+    // Code-block view: filter chips + the big Copy button at the corner.
+    const cbToolbar = $("codeblockToolbar");
+    if (cbToolbar) {
+      cbToolbar.querySelectorAll(".seg").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.codeblockFilter = btn.dataset.cbFilter;
+          save();
+          renderCodeblock();
+        });
+      });
+    }
+    const btnCb = $("btnCodeblockCopy");
+    if (btnCb) {
+      btnCb.addEventListener("click", () => {
+        copyLinksToClipboard(codeblockLinks(), state.codeblockFilter || "live");
+      });
+    }
     $("btnRemoveDead").addEventListener("click", () => {
       const before = state.links.length;
       state.links = state.links.filter((l) => l.status !== "dead");
