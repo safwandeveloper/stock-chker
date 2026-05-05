@@ -65,18 +65,43 @@
   }
 
   // --------- parsing & dedupe ---------
+  // Trim a single URL-ish run to the canonical link the user actually wants.
+  //
+  // Rules (in order):
+  //   1. Strip trailing punctuation that's clearly not part of a URL.
+  //   2. If the URL contains "=", truncate to the LAST "=" (inclusive). This
+  //      matches Google One / activation tokens which all end in "=" padding.
+  //      Anything pasted after the final "=" (junk text, another link with no
+  //      whitespace separator, etc.) is dropped.
+  function cleanUrl(raw) {
+    if (!raw) return "";
+    raw = raw.replace(/[)\],.;!?>]+$/g, "");
+    if (!raw) return "";
+    const lastEq = raw.lastIndexOf("=");
+    if (lastEq !== -1) {
+      raw = raw.slice(0, lastEq + 1);
+    }
+    return raw;
+  }
+
   function extractUrls(text) {
     if (!text) return [];
     const out = [];
     const seen = new Set();
     const matches = text.match(URL_REGEX) || [];
-    for (let raw of matches) {
-      // strip common trailing punctuation that isn't part of a URL
-      raw = raw.replace(/[)\],.;!?>]+$/g, "");
-      if (!raw) continue;
-      if (seen.has(raw)) continue;
-      seen.add(raw);
-      out.push(raw);
+    for (const raw of matches) {
+      // A single regex match may contain multiple concatenated URLs if the
+      // user's paste glued them together with no whitespace. Split on every
+      // internal "http(s)://" so each becomes its own candidate.
+      const parts = raw.split(/(?=https?:\/\/)/i);
+      for (const part of parts) {
+        const cleaned = cleanUrl(part);
+        if (!cleaned) continue;
+        if (!/^https?:\/\//i.test(cleaned)) continue;
+        if (seen.has(cleaned)) continue;
+        seen.add(cleaned);
+        out.push(cleaned);
+      }
     }
     return out;
   }
@@ -214,6 +239,54 @@
     }, 0);
   }
 
+  // Copy text to clipboard. Tries the modern async API first, falls back to
+  // a hidden textarea + execCommand("copy") for older browsers / iOS Safari
+  // when the page is served over plain http (where navigator.clipboard is
+  // unavailable).
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      // fall through to legacy path
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.left = "0";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function copyLinksToClipboard(links, label) {
+    if (!links.length) {
+      flash(`No ${label} links to copy.`);
+      return;
+    }
+    // Each link on its own line + 2 blank lines between, matching the .txt export.
+    const body = links.map((l) => l.url).join("\n\n\n");
+    const ok = await copyTextToClipboard(body);
+    if (ok) {
+      flash(`Copied ${links.length} ${label} link(s) to clipboard.`);
+    } else {
+      flash(`Couldn't copy ${label} links — long-press the box and copy manually.`);
+    }
+  }
+
   // --------- rendering ---------
   const $ = (id) => document.getElementById(id);
 
@@ -302,6 +375,7 @@
             <td class="time">${fmtTime(l.checkedAt)}</td>
             <td class="actions">
               <a class="open-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">Open</a>
+              <button class="ghost" data-act="copy" title="Copy this link to clipboard">Copy</button>
               ${checkBtn}
               <button class="mark-live" data-act="mark-live" title="Mark this link live">✓ Live</button>
               <button class="mark-dead" data-act="mark-dead" title="Mark this link dead">✕ Dead</button>
@@ -320,6 +394,13 @@
         else if (act === "remove") removeAt(i);
         else if (act === "mark-live") markStatus(i, "live");
         else if (act === "mark-dead") markStatus(i, "dead");
+        else if (act === "copy") {
+          const link = state.links[i];
+          if (!link) return;
+          copyTextToClipboard(link.url).then((ok) => {
+            flash(ok ? "Copied link to clipboard." : "Couldn't copy link.");
+          });
+        }
       });
     });
   }
@@ -458,6 +539,13 @@
     });
     $("btnDownloadAll").addEventListener("click", () => {
       downloadTxt(`stock-chker-all-${stamp()}.txt`, state.links);
+    });
+    $("btnCopyLive").addEventListener("click", () => {
+      const live = state.links.filter((l) => l.status === "live");
+      copyLinksToClipboard(live, "live");
+    });
+    $("btnCopyAll").addEventListener("click", () => {
+      copyLinksToClipboard(state.links, "all");
     });
     $("btnRemoveDead").addEventListener("click", () => {
       const before = state.links.length;
